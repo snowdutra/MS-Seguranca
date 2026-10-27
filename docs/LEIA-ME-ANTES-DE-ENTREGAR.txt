@@ -1,0 +1,10 @@
+ATENCAO: faltam duas evidencias que exigem o Grafana em funcionamento:
+1. docs/dashboard-grafana.png: screenshot real dos indicadores.
+2. docs/dashboard-exportado.json: resultado de Export > Export as code > Classic.
+
+O dashboard para provisionamento esta em:
+observability/grafana/dashboards/dashboard-ms-av-02.json
+
+Essas evidencias NAO foram simuladas. Execute docker compose, faca os testes,
+capture o print/exportacao reais, execute mvn test (ou confira o CI), e so
+entao publique o repositorio como entrega final.

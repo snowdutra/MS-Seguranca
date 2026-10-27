@@ -1,0 +1,9 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: ms-av-02-java
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["app:8080"]

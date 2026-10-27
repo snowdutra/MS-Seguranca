@@ -1,0 +1,33 @@
+server:
+  port: ${SERVER_PORT:8080}
+spring:
+  application:
+    name: ms-av-02-seguranca-observabilidade
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:h2:file:./data/seguranca-db;DB_CLOSE_ON_EXIT=FALSE}
+    driver-class-name: org.h2.Driver
+    username: ${SPRING_DATASOURCE_USERNAME:sa}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+  sql:
+    init:
+      mode: always
+app:
+  bootstrap:
+    admin-password: ${APP_ADMIN_PASSWORD:}
+    maintenance-password: ${APP_MANUTENCAO_PASSWORD:}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: never
+  metrics:
+    tags:
+      application: ${spring.application.name}
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs

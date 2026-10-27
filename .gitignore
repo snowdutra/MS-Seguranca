@@ -1,0 +1,23 @@
+# Java / IDE
+/target/
+*.class
+*.log
+.idea/
+.vscode/
+*.iml
+.project
+.classpath
+.settings/
+
+# Banco H2 e segredos
+data/*
+!data/.gitkeep
+*.mv.db
+*.trace.db
+.env
+.env.*
+!.env.example
+
+# Arquivos pessoais
+.DS_Store
+Thumbs.db
