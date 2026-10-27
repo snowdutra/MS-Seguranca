@@ -1,26 +1,28 @@
 # MS-AV-02 — Segurança e Observabilidade
 
-Projeto em **Java 21 + Spring Boot 3.5 + Maven**, baseado no enunciado `MS-AV-02 - Segurança e Observabilidade`.
+Projeto em **Java 21 + Spring Boot 3.5 + Maven**, baseado no enunciado **MS-AV-02 — Segurança e Observabilidade**.
 
 Implementa autenticação REST, autorização via `JdbcUserDetailsManager`, bloqueio após duas falhas consecutivas, troca de senha, métricas com Spring Actuator/Micrometer/Prometheus, Swagger/OpenAPI e dashboard Grafana provisionado automaticamente.
 
-> **Status da execução:** este projeto contém testes de integração com JUnit/MockMvc, executados pelo comando `mvn test` ou pela ação do GitHub. Confira o resultado no seu ambiente antes de entregar. A imagem real do dashboard deve ser capturada após subir os containers; não há imagem de execução simulada no repositório.
+O projeto inclui testes automatizados com JUnit/MockMvc, um ambiente completo com Docker Compose e evidências reais de observabilidade.
 
 ## 1. Requisitos
 
-- **Opção recomendada:** Docker Desktop com Docker Compose (inclui Java, Prometheus e Grafana no ambiente dos containers).
-- **Opção manual:** JDK 21 e Apache Maven 3.9+; Docker Desktop é necessário também para os serviços Prometheus e Grafana, caso queira executar o dashboard com `compose.yml`.
+- **Opção recomendada:** Docker Desktop com Docker Compose (executa aplicação Java, Prometheus e Grafana).
+- **Opção manual:** JDK 21 e Apache Maven 3.9+ para executar a aplicação e os testes localmente.
 
-## 2. Executar o sistema inteiro no Windows
+## 2. Executar o sistema completo no Windows
 
-No **PowerShell**, dentro da pasta deste repositório:
+No **PowerShell**, dentro da pasta do repositório:
 
 ```powershell
 Copy-Item .env.example .env
 notepad .env
 ```
 
-Substitua as três senhas de exemplo por senhas próprias. **Não envie `.env` para o GitHub** (está no `.gitignore`). A configuração `APP_ADMIN_PASSWORD` e `APP_MANUTENCAO_PASSWORD` serve para criar os perfis iniciais **somente se ainda não existirem** no banco. Depois de alterar `.env`, reiniciar não altera senhas previamente cadastradas.
+Substitua as três senhas de exemplo por senhas próprias. **Não envie o arquivo `.env` ao GitHub:** ele está no `.gitignore`.
+
+As variáveis `APP_ADMIN_PASSWORD` e `APP_MANUTENCAO_PASSWORD` são utilizadas para criar os usuários iniciais apenas se eles ainda não existirem no banco. Alterar o `.env` depois da criação não altera automaticamente as senhas existentes.
 
 ```powershell
 docker compose up -d --build
@@ -28,49 +30,55 @@ docker compose ps
 docker compose logs -f app
 ```
 
-Quando a aplicação estiver pronta, os endereços locais são:
+Quando a aplicação estiver pronta:
 
-| Componente | URL |
+| Componente | Endereço |
 | --- | --- |
 | API REST | http://localhost:8080 |
 | Swagger UI | http://localhost:8080/swagger-ui.html |
 | OpenAPI JSON | http://localhost:8080/v3/api-docs |
 | Health | http://localhost:8080/actuator/health |
 | Métricas Prometheus | http://localhost:8080/actuator/prometheus |
-| Interface Prometheus | http://localhost:9090 |
+| Prometheus | http://localhost:9090 |
 | Grafana | http://localhost:3000 |
 
-No Grafana, entre com `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` do `.env`. Em **Dashboards > MS-AV-02** abra **MS-AV-02 | Seguranca e Observabilidade**. A fonte Prometheus e o painel já são configurados pelos arquivos de `observability/`.
+No Grafana, entre com as credenciais `GRAFANA_ADMIN_USER` e `GRAFANA_ADMIN_PASSWORD` do `.env`. Em **Dashboards > MS-AV-02**, abra **MS-AV-02 | Seguranca e Observabilidade**. A fonte de dados Prometheus e o dashboard são provisionados pelos arquivos em `observability/`.
 
-Para encerrar: `docker compose down` (preserva os volumes). **Atenção:** `docker compose down -v` também apaga usuários, contagens persistidas no H2 e dados do Grafana.
+Para encerrar:
 
-## 3. Endpoints exigidos
+```powershell
+docker compose down
+```
 
-Os caminhos seguem o **enunciado literalmente** (inclusive a raiz `/`). `{userid}` é o campo `username`, pois o SQL usa `username` como chave primária.
+Esse comando preserva os volumes. **Atenção:** `docker compose down -v` remove também os volumes persistentes do H2, Prometheus e Grafana.
 
-| Método | Rota | Acesso | Corpo | Resposta de sucesso |
+## 3. Endpoints da atividade
+
+Os caminhos seguem o enunciado, inclusive a rota raiz `/`. O parâmetro `{userid}` representa `username`, chave primária da tabela de usuários.
+
+| Método | Rota | Acesso | Corpo | Sucesso |
 | --- | --- | --- | --- | --- |
 | `POST` | `/login` | Público | `{"username":"...","senha":"..."}` | `200` |
-| `PUT` | `/trocarsenha/{userid}` | Público, validando senha atual | `{"atual":"...","nova":"..."}` | `200` |
+| `PUT` | `/trocarsenha/{userid}` | Público, com validação da senha atual | `{"atual":"...","nova":"..."}` | `200` |
 | `POST` | `/` | `ROLE_MANUTENCAO` | `{"username":"...","senha":"..."}` | `201` |
-| `PUT` | `/unlock/{userid}` | `ROLE_ADMIN` | sem corpo | `200` |
-| `GET` | `/` | `ROLE_MANUTENCAO` | — | `200` |
+| `PUT` | `/unlock/{userid}` | `ROLE_ADMIN` | Sem corpo | `200` |
+| `GET` | `/` | `ROLE_MANUTENCAO` | Sem corpo | `200` |
 
-`401`: senha inválida, usuário bloqueado, ou falta de autenticação em rota protegida. `403`: autenticado sem a role necessária. `404`: recurso/usuário não encontrado nas operações aplicáveis. `409`: usuário duplicado. `400`: dados inválidos.
+Códigos HTTP utilizados: `400` para dados inválidos, `401` para credenciais inválidas ou falta de autenticação, `403` para falta de permissão, `404` para recurso inexistente e `409` para usuário duplicado.
 
-Usuários de exemplo, inicializados no primeiro start:
+### Usuários iniciais
 
-| Usuário | Role | Uso |
+| Usuário | Perfil | Finalidade |
 | --- | --- | --- |
-| `admin` | `ROLE_ADMIN` | desbloquear usuários |
-| `manutencao` | `ROLE_MANUTENCAO` | cadastrar e listar usuários |
-| usuários cadastrados | `ROLE_USUARIO` | efetuar login e trocar a própria senha mediante senha atual |
+| `admin` | `ROLE_ADMIN` | Desbloquear usuários |
+| `manutencao` | `ROLE_MANUTENCAO` | Cadastrar e listar usuários |
+| Usuários cadastrados | `ROLE_USUARIO` | Login e troca de senha |
 
-**Importante:** o endpoint `POST /login` verifica credenciais e devolve um resultado, **não emite um token**. As rotas protegidas utilizam **HTTP Basic** sobre o `JdbcUserDetailsManager`, porque é a autenticação mais direta que cumpre os requisitos de roles do enunciado. Em um sistema real, usaria HTTPS, proteção adicional contra força bruta, credenciais rotacionáveis e possivelmente OAuth2/OIDC conforme o contexto.
+O endpoint `POST /login` valida credenciais e retorna uma resposta REST, mas **não emite token**. As rotas protegidas utilizam **HTTP Basic**, integrado ao `JdbcUserDetailsManager`, para atender ao controle de permissões da atividade. Essa configuração destina-se ao ambiente de laboratório; em produção, seriam necessários HTTPS e controles adicionais de segurança.
 
-## 4. Teste manual rápido (PowerShell)
+## 4. Teste manual rápido
 
-Com os containers ativos, defina a mesma senha que colocou em `APP_MANUTENCAO_PASSWORD`:
+No **PowerShell**, com os contêineres ativos, use a senha definida em `APP_MANUTENCAO_PASSWORD`:
 
 ```powershell
 $base = 'http://localhost:8080'
@@ -78,71 +86,64 @@ $senhaManutencao = 'COLOQUE_A_SENHA_DO_SEU_ENV'
 $cred = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("manutencao:$senhaManutencao"))
 $headers = @{ Authorization = "Basic $cred" }
 
-# Cadastrar: deve retornar HTTP 201
+# Cadastrar usuário: HTTP 201
 Invoke-RestMethod -Uri "$base/" -Method Post -Headers $headers `
   -ContentType 'application/json' `
   -Body (@{ username='teste1'; senha='SenhaSegura#2026' } | ConvertTo-Json)
 
-# Listar: deve retornar uma lista SEM senhas
+# Listar usuários, sem expor senhas: HTTP 200
 Invoke-RestMethod -Uri "$base/" -Method Get -Headers $headers
 
-# Login correto: HTTP 200
+# Login válido: HTTP 200
 Invoke-RestMethod -Uri "$base/login" -Method Post `
   -ContentType 'application/json' `
   -Body (@{ username='teste1'; senha='SenhaSegura#2026' } | ConvertTo-Json)
 ```
 
-Para verificar o **bloqueio após 2 erros**, use o exemplo em [`docs/TESTES-MANUAIS.md`](docs/TESTES-MANUAIS.md). Consulte as métricas em `http://localhost:8080/actuator/prometheus` e atualize o Grafana. Testes de login feitos diretamente no endpoint protegido via Basic Auth não alteram os contadores da rota `/login`; são mecanismos distintos.
+Para testar **duas falhas consecutivas, bloqueio e desbloqueio**, consulte [`docs/TESTES-MANUAIS.md`](docs/TESTES-MANUAIS.md).
 
-## 5. Métricas e dashboard
+Os contadores de login são atualizados pelo endpoint `/login`. Uma autenticação HTTP Basic em rota protegida não incrementa esses contadores.
 
-| Métrica Prometheus | Tipo | Significado |
+## 5. Observabilidade: métricas e dashboard
+
+| Métrica Prometheus | Tipo | Descrição |
 | --- | --- | --- |
-| `app_logins_valid_total` | Counter | logins aceitos desde que a API iniciou |
-| `app_logins_invalid_total` | Counter | logins recusados desde que a API iniciou |
-| `app_users_blocked` | Gauge | usuários atualmente bloqueados, consultados no banco |
+| `app_logins_valid_total` | Counter | Logins aceitos desde o início do processo |
+| `app_logins_invalid_total` | Counter | Tentativas de login recusadas desde o início do processo |
+| `app_users_blocked` | Gauge | Quantidade atual de usuários bloqueados no banco |
 
-As contagens de logins são **contadores de processo** (reiniciam com a aplicação), como é comum em métricas Prometheus. O bloqueio de usuários e o número de falhas por conta ficam persistidos na tabela `login_attempts` do H2. O Prometheus mantém séries temporais no seu volume próprio.
+Os contadores são métricas do processo e reiniciam quando a aplicação reinicia. O estado de bloqueio e a contagem de falhas são persistidos no H2, na tabela `login_attempts`. O Prometheus mantém suas séries temporais em volume próprio.
 
-O dashboard **Classic JSON**, pronto para importação/provisionamento, está em:
+O dashboard Grafana possui três indicadores numéricos e um gráfico de tendência de logins por minuto.
 
-`observability/grafana/dashboards/dashboard-ms-av-02.json`
+### Arquivos do dashboard e evidências
 
-Ele contém três painéis de números e um gráfico de tendências. A fonte de dados Prometheus é provisionada por `observability/grafana/provisioning/datasources/prometheus.yml`.
+| Arquivo | Finalidade |
+| --- | --- |
+| [`observability/grafana/dashboards/dashboard-ms-av-02.json`](observability/grafana/dashboards/dashboard-ms-av-02.json) | Dashboard JSON utilizado no provisionamento automático |
+| [`docs/grafana-dashboard.png`](docs/grafana-dashboard.png) | Captura de tela real do dashboard em execução |
+| [`docs/dashboard-exportado.json`](docs/dashboard-exportado.json) | Exportação do dashboard obtida pela interface do Grafana |
 
-### Evidências obrigatórias para a entrega
+A fonte Prometheus é configurada em `observability/grafana/provisioning/datasources/prometheus.yml`, e o dashboard é carregado automaticamente pela configuração de provisionamento.
 
-O professor pede **print real do dashboard e exportação em JSON**. Após os testes no Grafana:
+Para reproduzir as evidências, abra `http://localhost:3000`, gere tentativas válidas e inválidas no endpoint `/login`, aguarde a coleta do Prometheus (a cada 5 segundos) e confira os indicadores. Para exportar o JSON, utilize a opção **Export** do dashboard no Grafana, selecione **Classic** quando disponível e salve o arquivo em `docs/dashboard-exportado.json`.
 
-1. Abra `http://localhost:3000` e selecione o dashboard.
-2. Gere tráfego de login válido e inválido; bloqueie `teste1` com duas senhas incorretas.
-3. Aguarde a coleta do Prometheus (configurada a cada 5 segundos) e confira os três indicadores.
-4. Capture um **print real do Grafana** (no Windows use `Win + Shift + S`) e salve como **`docs/dashboard-grafana.png`**.
-5. No Grafana: **Dashboards > abra o dashboard > Export > Export as code > Model: Classic > Download file**. Salve a exportação em **`docs/dashboard-exportado.json`**. O arquivo de provisionamento já é um JSON Classic, mas a exportação pela interface documenta o procedimento solicitado.
-6. Execute `git add .`, faça o commit e confira no GitHub público que ambos os arquivos de evidência estão presentes.
+> A imagem e a exportação JSON são evidências da execução. O JSON em `observability/` continua necessário para provisionar o dashboard automaticamente.
 
-> **Não suba um print fictício**. Os dois arquivos de evidência gerados depois da execução (`docs/dashboard-grafana.png` e `docs/dashboard-exportado.json`) precisam ser capturados no seu Grafana. Leia a seção de entrega antes do `git push`.
+## 6. Executar a aplicação com Maven
 
-## 6. Executar apenas o Spring Boot com Maven
-
-Tenha JDK 21 e Maven instalados, e, no **PowerShell**, configure as senhas de bootstrap:
+Com JDK 21 e Maven instalados, no **PowerShell**:
 
 ```powershell
 $env:APP_ADMIN_PASSWORD = 'SuaSenhaAdmin#2026'
 $env:APP_MANUTENCAO_PASSWORD = 'SuaSenhaManutencao#2026'
-mvn test
+mvn clean test
 mvn spring-boot:run
 ```
 
-A aplicação grava o H2 em `./data/seguranca-db.mv.db`, ignorado no Git. A inicialização executa `src/main/resources/schema.sql`. Com a aplicação Maven no host, a configuração de Prometheus no Compose (`app:8080`) aponta para o container, e não para a aplicação do host: para usar Grafana com Maven, execute o Compose ou adapte o alvo de scrape.
+A aplicação utiliza H2 persistente em `./data/seguranca-db.mv.db`, ignorado pelo Git. O esquema é inicializado por `src/main/resources/schema.sql`.
 
-## Correcao da suite de testes
-
-A classe de testes inclui `@AutoConfigureObservability` para habilitar o exportador
-Prometheus no contexto de `@SpringBootTest` (Spring Boot 3.5). Sem essa anotacao,
-o Spring Boot desativa registries de metricas externos durante testes, embora
-o endpoint funcione com a aplicacao iniciada normalmente. A troca de senha
-usa `JdbcUserDetailsManager.updateUser(UserDetails)` para persistir o novo hash.
+Ao executar somente o Spring Boot no host, o alvo de coleta `app:8080` configurado no Prometheus do Compose não aponta para a aplicação local; para visualizar o dashboard, utilize o Compose completo ou adapte o alvo de coleta.
 
 ## 7. Testes automatizados
 
@@ -151,66 +152,80 @@ mvn clean test
 mvn clean package
 ```
 
-O arquivo `MsAv02IntegrationTest.java` contém testes HTTP com MockMvc cobrindo login válido/inválido, bloqueio na 2ª falha, desbloqueio exclusivo do admin, permissões da manutenção, usuário duplicado, troca de senha pública, BCrypt, métricas e OpenAPI.
+A classe `MsAv02IntegrationTest.java` contém **12 testes de integração** com JUnit e MockMvc, cobrindo:
 
-Uma GitHub Action em `.github/workflows/testes.yml` também executa `mvn test` em push e pull request. **Consulte os resultados reais** do Maven e da Action: a inclusão de testes não equivale a uma execução bem-sucedida.
+- Login válido e inválido;
+- Bloqueio na segunda falha e desbloqueio exclusivo do administrador;
+- Rejeição de autenticação de usuário bloqueado;
+- Permissões de cadastro e listagem por perfil;
+- Cadastro de usuário, tratamento de duplicidade e proteção da senha com BCrypt;
+- Troca de senha com validação da senha atual;
+- Reinicialização da contagem de falhas após login válido;
+- Tratamento de entradas inválidas e usuários inexistentes;
+- Disponibilidade do Swagger/OpenAPI, health e métricas Prometheus.
 
-## 8. Estrutura principal
+Os testes de integração utilizam `@AutoConfigureObservability` para habilitar o registro de métricas no contexto de testes do Spring Boot 3.5. A troca de senha persiste o hash atualizado por `JdbcUserDetailsManager.updateUser(UserDetails)`.
+
+O workflow [`.github/workflows/testes.yml`](.github/workflows/testes.yml) executa `mvn test` em push e pull request. Consulte a aba **Actions** no GitHub para conferir o resultado de cada execução.
+
+## 8. Estrutura do projeto
 
 ```text
+.github/workflows/
+  testes.yml
 src/main/java/br/com/msav02/
   config/          SecurityConfig, OpenApiConfig, BootstrapConfig
   controller/      UsuarioController
-  dto/             objetos de requisicao e resposta
-  exception/       respostas HTTP de erro
-  repository/      consultas JDBC e controle de bloqueio
+  dto/             Requisições e respostas REST
+  exception/       Tratamento de erros HTTP
+  repository/      Consultas JDBC e controle de bloqueio
   service/         LoginService, UsuarioService
 src/main/resources/
-  schema.sql       usuarios, login_attempts, authorities
+  schema.sql
   application.yml
-src/test/           testes de integracao (JUnit + MockMvc)
+src/test/
+  .../MsAv02IntegrationTest.java
 observability/
   prometheus/prometheus.yml
   grafana/provisioning/...
   grafana/dashboards/dashboard-ms-av-02.json
-compose.yml         API + Prometheus + Grafana
-Dockerfile          build Java 21/Maven
-.env.example        variaveis sem credenciais reais
+docs/
+  grafana-dashboard.png
+  dashboard-exportado.json
+  TESTES-MANUAIS.md
+  LEIA-ME-ANTES-DE-ENTREGAR.txt
+compose.yml
+Dockerfile
+.env.example
+.gitignore
+pom.xml
+README.md
 ```
 
-## 9. Observações técnicas sobre o enunciado
+## 9. Decisões técnicas
 
-- O SQL copiado do professor traz uma vírgula antes de `)` em `login_attempts`; foi removida.
-- O campo `usuarios.senha VARCHAR(10)` não comporta um hash BCrypt (`60` caracteres). Foi atualizado para `VARCHAR(100)` e toda senha é armazenada com BCrypt.
-- `usuarios.enabled` foi acrescentado para compatibilidade com `JdbcUserDetailsManager`, assim como `authorities` para as roles.
-- Usuários são armazenados **exclusivamente em `usuarios`**, e tanto `/login` quanto o Basic Auth usam essa tabela. O manager executa cadastro e recupera as roles do mesmo banco.
-- Duas falhas **consecutivas** no `/login` bloqueiam a conta. O admin precisa desbloqueá-la; acertos anteriores à segunda falha zeram a contagem.
-- `{userid}` corresponde a `username`, a chave primária definida no enunciado.
-- `PUT /trocarsenha/{userid}` permanece público como exigido, mas exige a **senha atual correta**, evitando alteração arbitrária de credenciais.
-- OAuth2 não é obrigatório entre os endpoints descritos na atividade. Basic Auth é mantido apenas para este exercício, em execução local. Em produção, não exponha endpoints de métricas sem proteção adequada.
+- O SQL do enunciado tinha uma vírgula extra antes do fechamento da tabela `login_attempts`; ela foi removida.
+- O campo `usuarios.senha` foi ampliado para comportar hashes BCrypt, que têm 60 caracteres.
+- O campo `usuarios.enabled` e a tabela `authorities` atendem aos requisitos do `JdbcUserDetailsManager`.
+- A tabela `usuarios` é a fonte única de credenciais para o endpoint `/login` e para a autenticação HTTP Basic.
+- Duas falhas consecutivas em `/login` bloqueiam o usuário; um login válido antes da segunda falha zera a contagem.
+- O desbloqueio exige `ROLE_ADMIN`.
+- `{userid}` representa `username`, conforme a chave primária adotada.
+- A troca de senha exige a senha atual correta e armazena apenas o novo hash BCrypt.
+- O ambiente Docker publica as portas na interface local (`127.0.0.1`) para limitar a exposição durante os testes.
 
-## 10. GitHub e checklist de entrega
+## 10. Checklist de entrega
 
-Crie um **repositório público vazio** no GitHub, por exemplo `ms-av-02-seguranca-observabilidade`, e execute dentro desta pasta:
+- [x] Código-fonte publicado no GitHub em repositório público.
+- [x] README com requisitos, execução, endpoints e testes.
+- [x] Configuração de Docker Compose, Prometheus e Grafana.
+- [x] Dashboard JSON de provisionamento incluído no repositório.
+- [x] Captura real do dashboard em `docs/grafana-dashboard.png`.
+- [x] Testes automatizados executados localmente com sucesso (12 testes).
+- [x] Arquivos `.env`, banco H2 e `target/` ignorados pelo Git.
+- [ ] Confirmar o envio de `docs/dashboard-exportado.json` ao GitHub.
+- [ ] Confirmar o resultado da execução mais recente em **Actions**.
 
-```powershell
-git init
-git branch -M main
-git add .
-git commit -m "MS-AV-02: seguranca JDBC, login, bloqueio e observabilidade"
-git remote add origin https://github.com/SEU_USUARIO/ms-av-02-seguranca-observabilidade.git
-git push -u origin main
-```
+**Repositório:** https://github.com/snowdutra/MS-Seguranca
 
-Antes de enviar o link ao professor, confirme:
-
-- [ ] `mvn test` passa localmente **ou** a Action do GitHub passa.
-- [ ] A API sobe e o Swagger abre.
-- [ ] Bloqueio com 2 logins incorretos; desbloqueio exclusivo do `admin`.
-- [ ] Métricas aparecem em `/actuator/prometheus` e no Grafana.
-- [ ] `docs/dashboard-grafana.png` contém o **print real**.
-- [ ] `docs/dashboard-exportado.json` contém a **exportação feita no Grafana**.
-- [ ] `.env`, senhas reais, `data/*.mv.db` e `target/` **não** foram commitados.
-- [ ] Repositório está **público**, com README e `compose.yml`.
-
-**Fontes:** [enunciado oficial](https://github.com/esensato/ms-2026-02/blob/main/MS-AV-02-Seguran%C3%A7a-Observabilidade.md), [JdbcUserDetailsManager](https://docs.spring.io/spring-security/reference/servlet/authentication/passwords/jdbc.html), [Grafana provisioning](https://grafana.com/docs/grafana/latest/administration/provisioning/).
+**Referências:** [Enunciado oficial](https://github.com/esensato/ms-2026-02/blob/main/MS-AV-02-Seguran%C3%A7a-Observabilidade.md), [Spring Security JDBC](https://docs.spring.io/spring-security/reference/servlet/authentication/passwords/jdbc.html) e [Provisionamento do Grafana](https://grafana.com/docs/grafana/latest/administration/provisioning/).
